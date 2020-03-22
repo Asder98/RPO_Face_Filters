@@ -18,19 +18,16 @@ def drawAllPoints(img, pts):
 
     return overlay
 
-def Eyeliner(frame):
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+def FaceFilter(frame):
+    op = frame.copy()
+    gray = cv2.cvtColor(op, cv2.COLOR_BGR2GRAY)
     bounding_boxes = face_detector(gray, 0)# The 2nd argument means that we upscale the image by 'x' number of times to detect more faces.
     if bounding_boxes:    
         for i, bb in enumerate(bounding_boxes):
+
             face_landmark_points = lndMrkDetector(gray, bb)
             face_landmark_points = face_utils.shape_to_np(face_landmark_points)
-
-            op = drawAllPoints(frame, face_landmark_points)
-
-            #eye_landmark_points = getEyeLandmarkPts(face_landmark_points)
-            #eyeliner_points = getEyelinerPoints(eye_landmark_points)
-            #op = drawEyeliner(frame, eyeliner_points)
+            op = drawAllPoints(op, face_landmark_points)
         
         return op
     else:
@@ -47,7 +44,7 @@ def video(src = 0):
 	
     while(cap.isOpened):
         _ , frame = cap.read()
-        output_frame = Eyeliner(frame)
+        output_frame = FaceFilter(frame)
 
         if args['save']:
             out.write(output_frame)
@@ -67,7 +64,7 @@ def video(src = 0):
 def image(source):
     if os.path.isfile(source):
         img = cv2.imread(source)
-        output_frame = Eyeliner(img)
+        output_frame = FaceFilter(img)
         cv2.imshow("Artificial Eyeliner", cv2.resize(output_frame, (600, 600)))
         if args['save']:
             if os.path.isfile(args['save']+'.png'):
