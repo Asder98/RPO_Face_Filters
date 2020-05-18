@@ -1,55 +1,81 @@
 import numpy as np
 import dlib
 import cv2
-import matplotlib.pyplot as plt
-import skimage
-from scipy.interpolate import interp1d
 from imutils import face_utils
 import argparse
 import os
-from PIL import Image
+import imutils
+import math
 
 
 def drawAllPoints(img, pts):
     overlay = img.copy()
+    # printing dots on face markers
     for i in range(len(pts)):
-        #print("x: ", pts[i][0], " y: ", pts[i][1])
         cv2.circle(overlay, (pts[i][0], pts[i][1]), 2, (255, 0, 0), 2)
 
     return overlay
 
+
+def blurFace(img, pts): # blurring face
+    overlay = img.copy()
+
+    face_shape = pts[0:16]
+    face_shape2 = np.array(pts[78])
+    face_shape2 = np.vstack([face_shape2, [pts[74], pts[79], pts[73], pts[72], pts[80], pts[71], pts[70], pts[69],
+                                           pts[68], pts[76], pts[75], pts[77]]])
+    face_shape = np.append(face_shape, face_shape2, 0)
+
+    insensitivity = (overlay.shape[0]+overlay.shape[1])/2
+    insensitivity = math.floor(insensitivity/20)
+    if insensitivity % 2 == 0:
+        insensitivity = insensitivity + 1
+    blurred_image = cv2.GaussianBlur(overlay, (insensitivity, insensitivity), insensitivity-1)
+
+    mask = np.zeros(overlay.shape, dtype=np.uint8)
+    channel_count = overlay.shape[2]
+    ignore_mask_color = (255,) * channel_count
+    cv2.fillPoly(mask, np.int32([face_shape]), ignore_mask_color)
+
+    mask_inverse = np.ones(mask.shape).astype(np.uint8) * 255 - mask
+
+    final_image = cv2.bitwise_and(blurred_image, mask) + cv2.bitwise_and(overlay, mask_inverse)
+
+    return final_image
+
+
 def FaceFilter(frame):
     op = frame.copy()
     gray = cv2.cvtColor(op, cv2.COLOR_BGR2GRAY)
-    bounding_boxes = face_detector(gray, 0)# The 2nd argument means that we upscale the image by 'x' number of times to detect more faces.
-    if bounding_boxes:    
-        for i, bb in enumerate(bounding_boxes):
 
+    bounding_boxes = face_detector(gray, 0)  # The 2nd argument means that we upscale the image by 'x' number of times to detect more faces.
+    if bounding_boxes:
+        for i, bb in enumerate(bounding_boxes):
             face_landmark_points = lndMrkDetector(gray, bb)
             face_landmark_points = face_utils.shape_to_np(face_landmark_points)
-            op = drawAllPoints(op, face_landmark_points)
-        
+            op = blurFace(op, face_landmark_points)
+
         return op
     else:
         return frame
 
-def video(src = 0):
 
+def video(src=0):
     cap = cv2.VideoCapture(src)
 
     if args['save']:
-        if os.path.isfile(args['save']+'.avi'):
-            os.remove(args['save']+'.avi')
-        out = cv2.VideoWriter(args['save']+'.avi',cv2.VideoWriter_fourcc('M','J','P','G'), 30,(int(cap.get(3)),int(cap.get(4))))
-	
-    while(cap.isOpened):
-        _ , frame = cap.read()
+        if os.path.isfile(args['save'] + '.avi'):
+            os.remove(args['save'] + '.avi')
+        out = cv2.VideoWriter(args['save'] + '.avi', cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 30,
+                              (int(cap.get(3)), int(cap.get(4))))
+
+    while cap.isOpened:
+        _, frame = cap.read()
         output_frame = FaceFilter(frame)
 
         if args['save']:
             out.write(output_frame)
-
-        cv2.imshow("Artificial Eyeliner", cv2.resize(output_frame, (600,600)))
+        cv2.imshow("Face Filter", output_frame)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
@@ -65,11 +91,12 @@ def image(source):
     if os.path.isfile(source):
         img = cv2.imread(source)
         output_frame = FaceFilter(img)
-        cv2.imshow("Artificial Eyeliner", cv2.resize(output_frame, (600, 600)))
+        resized_img = imutils.resize(output_frame, height=900)
+        cv2.imshow("Face Filter", resized_img)
         if args['save']:
-            if os.path.isfile(args['save']+'.png'):
-                os.remove(args['save']+'.png')
-            cv2.imwrite(args['save']+'.png', output_frame)
+            if os.path.isfile(args['save'] + '.png'):
+                os.remove(args['save'] + '.png')
+            cv2.imwrite(args['save'] + '.png', output_frame)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
@@ -78,7 +105,7 @@ def image(source):
 
 
 if __name__ == "__main__":
-    
+
     ap = argparse.ArgumentParser()
     ap.add_argument("-v", "--video", required=False, help="Path to video file")
     ap.add_argument("-i", "--image", required=False, help="Path to image")
@@ -92,9 +119,9 @@ if __name__ == "__main__":
         dataFile = args['dat']
 
     else:
-        dataFile = "shape_predictor_68_face_landmarks.dat"
+        dataFile = "shape_predictor_81_face_landmarks.dat"
 
-    color = (0,0,0)
+    color = (0, 0, 0)
     thickness = 2
     face_detector = dlib.get_frontal_face_detector()
     lndMrkDetector = dlib.shape_predictor(dataFile)
@@ -109,12 +136,12 @@ if __name__ == "__main__":
     if args['image']:
         image(args['image'])
 
-    if args['video'] and args['video']!='webcam':
+    if args['video'] and args['video'] != 'webcam':
         if os.path.isfile(args['video']):
             video(args['video'])
 
         else:
             print("File not found :( ")
 
-    elif args['video']=='webcam':
+    elif args['video'] == 'webcam':
         video(0)
