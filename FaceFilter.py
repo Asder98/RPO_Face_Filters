@@ -10,14 +10,14 @@ import math
 
 def drawAllPoints(img, pts):
     overlay = img.copy()
-    # printing dots on face markers
+    # drawing face landmarks
     for i in range(len(pts)):
-        cv2.circle(overlay, (pts[i][0], pts[i][1]), 2, (255, 0, 0), 2)
+        cv2.circle(overlay, (pts[i][0], pts[i][1]), 1, (0, 0, 250), 2)
 
     return overlay
 
 
-def blurFace(img, pts): # blurring face
+def blurFace(img, pts):  # blurring face
     overlay = img.copy()
 
     face_shape = pts[0:16]
@@ -26,11 +26,11 @@ def blurFace(img, pts): # blurring face
                                            pts[68], pts[76], pts[75], pts[77]]])
     face_shape = np.append(face_shape, face_shape2, 0)
 
-    insensitivity = (overlay.shape[0]+overlay.shape[1])/2
-    insensitivity = math.floor(insensitivity/20)
+    insensitivity = (overlay.shape[0] + overlay.shape[1]) / 2
+    insensitivity = math.floor(insensitivity / 20)
     if insensitivity % 2 == 0:
         insensitivity = insensitivity + 1
-    blurred_image = cv2.GaussianBlur(overlay, (insensitivity, insensitivity), insensitivity-1)
+    blurred_image = cv2.GaussianBlur(overlay, (insensitivity, insensitivity), insensitivity - 1)
 
     mask = np.zeros(overlay.shape, dtype=np.uint8)
     channel_count = overlay.shape[2]
@@ -48,12 +48,16 @@ def FaceFilter(frame):
     op = frame.copy()
     gray = cv2.cvtColor(op, cv2.COLOR_BGR2GRAY)
 
-    bounding_boxes = face_detector(gray, 0)  # The 2nd argument means that we upscale the image by 'x' number of times to detect more faces.
+    bounding_boxes = face_detector(gray,
+                                   0)
+
+
     if bounding_boxes:
         for i, bb in enumerate(bounding_boxes):
             face_landmark_points = lndMrkDetector(gray, bb)
             face_landmark_points = face_utils.shape_to_np(face_landmark_points)
-            op = blurFace(op, face_landmark_points)
+            op = drawAllPoints(op, face_landmark_points)
+            #op = blurFace(op, face_landmark_points)
 
         return op
     else:
@@ -110,8 +114,6 @@ if __name__ == "__main__":
     ap.add_argument("-v", "--video", required=False, help="Path to video file")
     ap.add_argument("-i", "--image", required=False, help="Path to image")
     ap.add_argument("-d", "--dat", required=False, help="Path to shape_predictor_68_face_landmarks.dat")
-    ap.add_argument("-t", "--thickness", required=False, help="Enter int value of thickness (recommended 0-5)")
-    ap.add_argument("-c", "--color", required=False, help='Enter R G B color value', nargs=3)
     ap.add_argument("-s", "--save", required=False, help='Enter the file name to save')
     args = vars(ap.parse_args())
 
@@ -125,13 +127,6 @@ if __name__ == "__main__":
     thickness = 2
     face_detector = dlib.get_frontal_face_detector()
     lndMrkDetector = dlib.shape_predictor(dataFile)
-
-    if args['color']:
-        color = list(map(int, args['color']))
-        color = tuple(color)
-
-    if args['thickness']:
-        thickness = int(args['thickness'])
 
     if args['image']:
         image(args['image'])
